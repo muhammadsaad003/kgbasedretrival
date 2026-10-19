@@ -13,6 +13,11 @@ The backend is a FastAPI service hosted on Hugging Face Spaces: [`saad003/rad-re
 
 ## Features
 
+- **Radiology viewer** for the query image: pan, scroll-to-zoom, window/level by dragging (or `Shift`+drag), invert, rotate, flip, reset (double-click) and full screen, with PACS-style corner overlays
+- **Study bar** (patient-banner style): accession number, image, modality, region, view, k, acquisition time and live status
+- **Analysis pipeline** view while a search runs: staged steps (preprocessing → feature extraction → similarity search → findings → concept grounding), progress bar and an ECG-style trace. Results are deliberately held for a random 5–10 s; change `RESULT_DELAY_MIN_MS` / `RESULT_DELAY_MAX_MS` in `src/App.tsx` (0 disables it)
+- **Compare mode**: query and reference side by side with synced window/level and zoom (card "Compare" button, or `C` in the detail view)
+- Hover a concept to highlight the results carrying it; click to filter
 - Drag-and-drop, file picker, or paste an image from the clipboard (`Ctrl+V`)
 - Six one-click samples from the ROCOv2 test split (CT, X-ray, MRI, ultrasound, angiography, PET)
 - Choose how many neighbours to retrieve (k = 5–24, default 5)
@@ -117,8 +122,8 @@ src/
   reportInfo.ts       Report IDs, file names and form fields
   samples.ts          Sample images
   hooks.ts            API status, theme, dialogs, timers, clipboard
-  App.tsx             State and layout
-  components/         Header, QueryPanel, Analysis, Results, Lightbox, ReportDialog, States, icons
+  App.tsx             State, layout and the analysis delay
+  components/         Header, StudyBar, QueryPanel, Viewer, Analysis, Results, Lightbox, ReportDialog, States, icons
   styles.css          Design tokens and styles (light and dark)
 ```
 

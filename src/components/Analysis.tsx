@@ -7,9 +7,12 @@ interface Props {
   response: SearchResponse;
   elapsedMs?: number;
   onReport: () => void;
+  filter: string | null;
+  onFilter: (cui: string | null) => void;
+  onHighlight: (cui: string | null) => void;
 }
 
-export function Analysis({ response, elapsedMs, onReport }: Props) {
+export function Analysis({ response, elapsedMs, onReport, filter, onFilter, onHighlight }: Props) {
   const { results } = response;
   const n = results.length;
   const consensus = modalityConsensus(results);
@@ -96,7 +99,9 @@ export function Analysis({ response, elapsedMs, onReport }: Props) {
       <section className="profile" aria-labelledby="profile-title">
         <div className="profile-head">
           <h3 id="profile-title" className="subsection-title">Concept profile</h3>
-          <span className="section-meta">UMLS concepts carried by the {n} retrieved neighbours</span>
+          <span className="section-meta">
+            UMLS concepts carried by the {n} retrieved neighbours · hover to highlight, click to filter
+          </span>
         </div>
         {groups.length === 0 ? (
           <p className="note">None of the retrieved neighbours carry curated concepts.</p>
@@ -106,18 +111,33 @@ export function Analysis({ response, elapsedMs, onReport }: Props) {
               <div key={group} className="profile-group">
                 <h4 className="profile-group-title">{GROUP_LABEL[group]}</h4>
                 <ul className="profile-list">
-                  {items.map((s) => (
-                    <li key={s.concept.cui} className={`profile-row g-${s.concept.group}`} title={`${s.concept.name} (${s.concept.cui})`}>
-                      <span className="profile-name">{s.concept.label}</span>
-                      <span className="profile-cui mono">{s.concept.cui}</span>
-                      <span className="profile-bar" aria-hidden="true">
-                        <i style={{ width: `${(s.count / Math.max(1, n)) * 100}%` }} />
-                      </span>
-                      <span className="profile-count mono">
-                        {s.count}/{n}
-                      </span>
-                    </li>
-                  ))}
+                  {items.map((s) => {
+                    const active = filter === s.concept.cui;
+                    return (
+                      <li key={s.concept.cui}>
+                        <button
+                          type="button"
+                          className={`profile-row g-${s.concept.group}${active ? " is-active" : ""}`}
+                          title={`${s.concept.name} (${s.concept.cui})`}
+                          aria-pressed={active}
+                          onClick={() => onFilter(active ? null : s.concept.cui)}
+                          onMouseEnter={() => onHighlight(s.concept.cui)}
+                          onMouseLeave={() => onHighlight(null)}
+                          onFocus={() => onHighlight(s.concept.cui)}
+                          onBlur={() => onHighlight(null)}
+                        >
+                          <span className="profile-name">{s.concept.label}</span>
+                          <span className="profile-cui mono">{s.concept.cui}</span>
+                          <span className="profile-bar" aria-hidden="true">
+                            <i style={{ width: `${(s.count / Math.max(1, n)) * 100}%` }} />
+                          </span>
+                          <span className="profile-count mono">
+                            {s.count}/{n}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             ))}

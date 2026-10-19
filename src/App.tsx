@@ -12,13 +12,38 @@ import { QueryPanel } from "./components/QueryPanel";
 import { ReportDialog } from "./components/ReportDialog";
 import { Results, ResultsSkeleton } from "./components/Results";
 import { EmptyState, ErrorState, LoadingState } from "./components/States";
+import { StudyBar } from "./components/StudyBar";
 
 const K_OPTIONS = [5, 10, 15, 20, 24];
 const DEFAULT_K = 5;
 const MAX_HISTORY = 8;
 
+// Results are deliberately held for a random 5–10 s so the analysis pipeline is visible
+// (the max leaves headroom for rendering). Set both to 0 to show results as soon as the API answers.
+const RESULT_DELAY_MIN_MS = 5000;
+const RESULT_DELAY_MAX_MS = 9500;
+
 let nextEntryId = 0;
 let nextRunId = 0;
+
+function wait(ms: number, signal: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timer = window.setTimeout(resolve, ms);
+    signal.addEventListener(
+      "abort",
+      () => {
+        window.clearTimeout(timer);
+        reject(new DOMException("Aborted", "AbortError"));
+      },
+      { once: true },
+    );
+  });
+}
+
+function makeAccession(seq: number, d = new Date()): string {
+  const p = (v: number, n = 2) => String(v).padStart(n, "0");
+  return `ACC-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(seq, 4)}`;
+}
 
 export default function App() {
   const { theme, cycle } = useTheme();
@@ -35,6 +60,8 @@ export default function App() {
   const [reportOpen, setReportOpen] = useState(false);
   // Kept here so the details typed into the report form survive closing and reopening it.
   const [reportMeta, setReportMeta] = useState<ReportMeta>(EMPTY_REPORT_META);
+  const [highlight, setHighlight] = useState<string | null>(null);
+  const [compare, setCompare] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
 
   const current = entries.find((e) => e.id === currentId) ?? null;
@@ -57,20 +84,26 @@ export default function App() {
       abortRef.current = ctrl;
       const runId = ++nextRunId;
       const startedAt = Date.now();
+      const expectedMs = RESULT_DELAY_MIN_MS + Math.random() * (RESULT_DELAY_MAX_MS - RESULT_DELAY_MIN_MS);
 
       setEntries((es) =>
         es.map((e) =>
           e.id === entry.id
-            ? { ...e, k: kValue, runId, status: "loading", startedAt, response: undefined, error: undefined }
+            ? { ...e, k: kValue, runId, status: "loading", startedAt, expectedMs, response: undefined, error: undefined }
             : e,
         ),
       );
       setFilter(null);
+      setHighlight(null);
       setLightbox(null);
       setReportOpen(false);
 
       try {
-        const response = await searchByImage(entry.file, kValue, ctrl.signal);
+        // Errors surface immediately; successful results wait out the analysis delay.
+        const [response] = await Promise.all([
+          searchByImage(entry.file, kValue, ctrl.signal),
+          wait(expectedMs, ctrl.signal),
+        ]);
         patchRun(entry.id, runId, { status: "done", response, elapsedMs: Date.now() - startedAt });
         markOnline();
       } catch (err) {
@@ -103,8 +136,11 @@ export default function App() {
       }
       setNotice(null);
       const kValue = kRef.current;
+      const seq = ++nextEntryId;
       const entry: QueryEntry = {
-        id: `q${++nextEntryId}`,
+        id: `q${seq}`,
+        accession: makeAccession(seq),
+        createdAt: Date.now(),
         file,
         previewUrl: URL.createObjectURL(file),
         name,
@@ -218,6 +254,10 @@ export default function App() {
   );
   const closeLightbox = useCallback(() => setLightbox(null), []);
   const closeReport = useCallback(() => setReportOpen(false), []);
+  const openResult = (index: number, withCompare = false) => {
+    setCompare(withCompare);
+    setLightbox(index);
+  };
 
   return (
     <div className="app">
@@ -227,6 +267,7 @@ export default function App() {
       <Header theme={theme} onCycleTheme={cycle} />
 
       <main className="layout">
+        {current && <StudyBar entry={current} />}
         <aside className="sidebar" aria-label="Query">
           <QueryPanel
             serverUnreachable={api.status === "offline"}
@@ -252,7 +293,7 @@ export default function App() {
           {!current && <EmptyState />}
           {current?.status === "loading" && (
             <>
-              <LoadingState startedAt={current.startedAt} />
+              <LoadingState startedAt={current.startedAt} expectedMs={current.expectedMs} k={current.k} />
               <ResultsSkeleton count={current.k} />
             </>
           )}
@@ -266,13 +307,18 @@ export default function App() {
                 response={current.response}
                 elapsedMs={current.elapsedMs}
                 onReport={() => setReportOpen(true)}
+                filter={filter}
+                onFilter={setFilter}
+                onHighlight={setHighlight}
               />
               <Results
                 results={results}
                 visible={visible}
                 filter={filter}
                 onFilter={setFilter}
-                onOpen={setLightbox}
+                highlight={highlight}
+                onHighlight={setHighlight}
+                onOpen={openResult}
               />
             </>
           )}
@@ -300,6 +346,10 @@ export default function App() {
           onClose={closeLightbox}
           onSearch={onSearchNeighbour}
           searching={preparing !== null}
+          queryUrl={current?.previewUrl ?? ""}
+          queryName={current?.name ?? ""}
+          compare={compare}
+          onCompare={setCompare}
         />
       )}
 

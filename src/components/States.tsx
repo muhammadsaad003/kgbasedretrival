@@ -1,7 +1,7 @@
 import { describeConcept, GROUP_LABEL, type ConceptGroup } from "../concepts";
 import { useElapsed } from "../hooks";
 import { ConceptChip } from "./ui";
-import { AlertIcon, DatabaseIcon, LayersIcon, NetworkIcon, RefreshIcon, SearchIcon, SparkIcon } from "./icons";
+import { AlertIcon, CheckIcon, DatabaseIcon, LayersIcon, NetworkIcon, RefreshIcon, SearchIcon, SparkIcon } from "./icons";
 
 const VOCAB: Record<Exclude<ConceptGroup, "other">, string[]> = {
   modality: ["C0040405", "C1306645", "C0024485", "C0041618", "C0002978", "C0032743"],
@@ -16,10 +16,32 @@ const PIPELINE = [
   { icon: NetworkIcon, title: "Ground in concepts", text: "Neighbours’ UMLS concepts vote on modality, region and view." },
 ];
 
+// `at` is the fraction of the analysis time at which the step completes.
+const ANALYSIS_STEPS = [
+  { title: "Image preprocessing", detail: "Decode, convert to RGB and resize for the encoder", at: 0.12 },
+  { title: "Feature extraction", detail: "PubMedCLIP ViT-B/32 image embedding", at: 0.34 },
+  { title: "Similarity search", detail: "FAISS inner-product search over 80,080 ROCOv2 images", at: 0.58 },
+  { title: "Findings generation", detail: "Reference caption on exact match, otherwise BLIP-ROCO", at: 0.8 },
+  { title: "Concept grounding", detail: "Pooling UMLS concepts of the nearest reference cases", at: Infinity },
+];
+
+/** Animated ECG trace used as a "working" indicator. */
+export function EcgTrace({ className = "" }: { className?: string }) {
+  const beat = "h22 l4 -5 l4 5 h6 l3 -16 l4 30 l4 -18 l3 4 h8 l5 -6 l5 6 h16";
+  const d = `M0 20 ${beat} ${beat} ${beat} ${beat}`;
+  return (
+    <svg className={`ecg ${className}`} viewBox="0 0 336 40" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <path d={d} className="ecg-base" pathLength={100} />
+      <path d={d} className="ecg-trace" pathLength={100} />
+    </svg>
+  );
+}
+
 export function EmptyState() {
   return (
     <div className="empty">
       <section className="card hero">
+        <EcgTrace className="hero-ecg" />
         <span className="eyebrow">
           <DatabaseIcon size={14} /> ROCOv2 · 80,080 indexed images
         </span>
@@ -60,42 +82,64 @@ export function EmptyState() {
           ))}
         </div>
       </section>
-
-      <dl className="stat-strip">
-        <div>
-          <dt>Indexed images</dt>
-          <dd className="mono">80,080</dd>
-        </div>
-        <div>
-          <dt>Train / valid / test</dt>
-          <dd className="mono">60,163 / 9,945 / 9,972</dd>
-        </div>
-        <div>
-          <dt>Models</dt>
-          <dd>PubMedCLIP · BLIP-ROCO</dd>
-        </div>
-      </dl>
     </div>
   );
 }
 
-export function LoadingState({ startedAt }: { startedAt: number | null }) {
+export function LoadingState({ startedAt, expectedMs, k }: { startedAt: number | null; expectedMs?: number; k: number }) {
   const elapsed = useElapsed(startedAt, true);
-  const slow = elapsed > 10_000;
+  const expected = expectedMs ?? 6000;
+  const p = elapsed / expected;
+  const progress = Math.min(p, 0.97);
+  const active = ANALYSIS_STEPS.findIndex((s) => p < s.at);
+  const slow = elapsed > expected + 8000;
+
   return (
-    <section className="card loading" role="status" aria-live="polite">
-      <div className="loading-head">
-        <span className="spinner" aria-hidden="true" />
-        <div>
-          <h2 className="section-title">Searching the index…</h2>
-          <p className="section-meta mono">{(elapsed / 1000).toFixed(1)} s</p>
+    <section className="card analysis-run" role="status" aria-live="polite" aria-label="Analysing image">
+      <div className="run-head">
+        <div className="run-title">
+          <span className="live-dot" aria-hidden="true" />
+          <div>
+            <h2 className="section-title">Analysing image</h2>
+            <p className="section-meta">Retrieving the {k} most similar reference cases</p>
+          </div>
         </div>
+        <span className="run-time mono">{(elapsed / 1000).toFixed(1)} s</span>
       </div>
-      <ol className="loading-steps">
-        <li>Encode with PubMedCLIP</li>
-        <li>Nearest-neighbour search in FAISS</li>
-        <li>Caption: dataset ground truth or BLIP</li>
+
+      <div className="run-monitor">
+        <EcgTrace className="run-ecg" />
+        <span className="run-percent mono">{Math.round(progress * 100)}%</span>
+      </div>
+      <div
+        className="run-progress"
+        role="progressbar"
+        aria-label="Analysis progress"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={Math.round(progress * 100)}
+      >
+        <i style={{ width: `${progress * 100}%` }} />
+      </div>
+
+      <ol className="run-steps">
+        {ANALYSIS_STEPS.map((s, i) => {
+          const state = i < active ? "done" : i === active ? "active" : "pending";
+          return (
+            <li key={s.title} className={`run-step is-${state}`}>
+              <span className="run-marker" aria-hidden="true">
+                {state === "done" ? <CheckIcon size={13} /> : state === "active" ? <span className="spinner spinner-xs" /> : i + 1}
+              </span>
+              <span className="run-text">
+                <strong>{s.title}</strong>
+                <span>{s.detail}</span>
+              </span>
+              <span className="run-state">{state === "done" ? "Done" : state === "active" ? "Running" : "Queued"}</span>
+            </li>
+          );
+        })}
       </ol>
+
       {slow && (
         <p className="note">
           Still working. If the Hugging Face Space was asleep, the first request can take a minute or two while the models load.

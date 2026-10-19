@@ -1,7 +1,9 @@
 import { useRef, useState, type DragEvent, type KeyboardEvent } from "react";
+import { aggregateConcepts, modalityConsensus } from "../concepts";
 import type { Sample } from "../samples";
 import type { QueryEntry } from "../types";
 import { formatBytes } from "./ui";
+import { QueryViewer } from "./Viewer";
 import { AlertIcon, ImageIcon, RefreshIcon, UploadIcon, XIcon } from "./icons";
 
 const SOURCE_LABEL: Record<QueryEntry["source"], string> = {
@@ -10,6 +12,15 @@ const SOURCE_LABEL: Record<QueryEntry["source"], string> = {
   sample: "Sample",
   neighbour: "From results",
 };
+
+/** Top-right viewer overlay: modality and region once the analysis is done. */
+function viewerInfo(entry: QueryEntry): string[] {
+  if (entry.status === "loading") return ["ANALYSING…"];
+  const results = entry.status === "done" ? entry.response?.results ?? [] : [];
+  const consensus = modalityConsensus(results);
+  const region = aggregateConcepts(results).find((s) => s.concept.group === "region");
+  return [consensus?.concept.label.toUpperCase(), region?.concept.label.toUpperCase()].filter((s): s is string => !!s);
+}
 
 interface Props {
   serverUnreachable: boolean;
@@ -90,11 +101,15 @@ export function QueryPanel(props: Props) {
 
         {current ? (
           <div className={`preview${busy ? " is-scanning" : ""}`}>
-            <div className="well preview-well">
-              <img src={current.previewUrl} alt="Query image preview" />
-              {busy && <span className="scanline" aria-hidden="true" />}
+            <QueryViewer
+              key={current.id}
+              src={current.previewUrl}
+              name={current.name}
+              topRight={viewerInfo(current)}
+              scanning={busy}
+            >
               {dragging && <div className="drop-overlay">Drop to replace</div>}
-            </div>
+            </QueryViewer>
             <div className="preview-meta">
               <div className="preview-name" title={current.name}>
                 {current.name}

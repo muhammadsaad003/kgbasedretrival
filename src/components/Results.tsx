@@ -2,17 +2,19 @@ import { useState } from "react";
 import type { RetrievedImage } from "../api";
 import { aggregateConcepts, parseConcepts } from "../concepts";
 import { ConceptChip, SplitBadge, formatScore } from "./ui";
-import { ImageIcon } from "./icons";
+import { ColumnsIcon, ImageIcon } from "./icons";
 
 interface Props {
   results: RetrievedImage[];
   visible: RetrievedImage[];
   filter: string | null;
   onFilter: (cui: string | null) => void;
-  onOpen: (index: number) => void;
+  highlight: string | null;
+  onHighlight: (cui: string | null) => void;
+  onOpen: (index: number, compare?: boolean) => void;
 }
 
-export function Results({ results, visible, filter, onFilter, onOpen }: Props) {
+export function Results({ results, visible, filter, onFilter, highlight, onHighlight, onOpen }: Props) {
   const stats = aggregateConcepts(results);
   const rankOf = new Map(results.map((r, i) => [r.ID, i + 1]));
 
@@ -41,6 +43,8 @@ export function Results({ results, visible, filter, onFilter, onOpen }: Props) {
               className={`filter filter-${s.concept.group}${filter === s.concept.cui ? " is-selected" : ""}`}
               aria-pressed={filter === s.concept.cui}
               onClick={() => onFilter(filter === s.concept.cui ? null : s.concept.cui)}
+              onMouseEnter={() => onHighlight(s.concept.cui)}
+              onMouseLeave={() => onHighlight(null)}
               title={`${s.concept.name} (${s.concept.cui})`}
             >
               <span className="chip-dot" aria-hidden="true" />
@@ -56,7 +60,13 @@ export function Results({ results, visible, filter, onFilter, onOpen }: Props) {
         <ul className="grid">
           {visible.map((r, i) => (
             <li key={r.ID}>
-              <ResultCard item={r} rank={rankOf.get(r.ID) ?? i + 1} onOpen={() => onOpen(i)} />
+              <ResultCard
+                item={r}
+                rank={rankOf.get(r.ID) ?? i + 1}
+                dim={highlight !== null && !parseConcepts(r.concepts_manual).some((c) => c.cui === highlight)}
+                onOpen={() => onOpen(i)}
+                onCompare={() => onOpen(i, true)}
+              />
             </li>
           ))}
         </ul>
@@ -65,47 +75,64 @@ export function Results({ results, visible, filter, onFilter, onOpen }: Props) {
   );
 }
 
-function ResultCard({ item, rank, onOpen }: { item: RetrievedImage; rank: number; onOpen: () => void }) {
+function ResultCard({
+  item,
+  rank,
+  dim,
+  onOpen,
+  onCompare,
+}: {
+  item: RetrievedImage;
+  rank: number;
+  dim: boolean;
+  onOpen: () => void;
+  onCompare: () => void;
+}) {
   const [state, setState] = useState<"loading" | "loaded" | "failed">("loading");
   const concepts = parseConcepts(item.concepts_manual);
   const caption = item.caption?.trim() || "No caption.";
 
   return (
-    <button type="button" className="result" onClick={onOpen} aria-label={`Rank ${rank}, similarity ${formatScore(item.score)}: ${caption}`}>
-      <span className={`well result-well is-${state}`}>
-        {state === "failed" ? (
-          <span className="img-fallback">
-            <ImageIcon size={22} />
-            Image unavailable
-          </span>
-        ) : (
-          <img
-            src={item.image_url}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            onLoad={() => setState("loaded")}
-            onError={() => setState("failed")}
-          />
-        )}
-        <span className="rank">#{rank}</span>
-        <SplitBadge split={item.split} />
-      </span>
-      <span className="result-body">
-        <span className="result-score">
-          <span className="mono">{formatScore(item.score)}</span>
-          <span className="result-id mono">{item.ID.replace("ROCOv2_2023_", "")}</span>
+    <div className={`result-wrap${dim ? " is-dim" : ""}`}>
+      <button type="button" className="result" onClick={onOpen} aria-label={`Rank ${rank}, similarity ${formatScore(item.score)}: ${caption}`}>
+        <span className={`well result-well is-${state}`}>
+          {state === "failed" ? (
+            <span className="img-fallback">
+              <ImageIcon size={22} />
+              Image unavailable
+            </span>
+          ) : (
+            <img
+              src={item.image_url}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              onLoad={() => setState("loaded")}
+              onError={() => setState("failed")}
+            />
+          )}
+          <span className="rank">#{rank}</span>
+          <SplitBadge split={item.split} />
         </span>
-        <span className="result-caption">{caption}</span>
-        {concepts.length > 0 && (
-          <span className="chips">
-            {concepts.map((c) => (
-              <ConceptChip key={c.cui} concept={c} />
-            ))}
+        <span className="result-body">
+          <span className="result-score">
+            <span className="mono">{formatScore(item.score)}</span>
+            <span className="result-id mono">{item.ID.replace("ROCOv2_2023_", "")}</span>
           </span>
-        )}
-      </span>
-    </button>
+          <span className="result-caption">{caption}</span>
+          {concepts.length > 0 && (
+            <span className="chips">
+              {concepts.map((c) => (
+                <ConceptChip key={c.cui} concept={c} />
+              ))}
+            </span>
+          )}
+        </span>
+      </button>
+      <button type="button" className="result-compare" onClick={onCompare} aria-label={`Compare #${rank} with the query image`}>
+        <ColumnsIcon size={14} /> Compare
+      </button>
+    </div>
   );
 }
 

@@ -173,6 +173,77 @@ export const DownloadIcon = (p: IconProps) => (
   </Svg>
 );
 
+export const HandIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V12" />
+    <path d="M11 11.5v-7a1.5 1.5 0 0 1 3 0V12" />
+    <path d="M14 11.5V6.5a1.5 1.5 0 0 1 3 0V14" />
+    <path d="M17 9.5a1.5 1.5 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.5a6 6 0 0 1-4.9-2.5L4.3 15a1.6 1.6 0 0 1 2.4-2.1L8 14" />
+  </Svg>
+);
+
+export const ContrastIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 3a9 9 0 0 1 0 18Z" fill="currentColor" />
+  </Svg>
+);
+
+export const ZoomInIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.5-3.5M11 8v6M8 11h6" />
+  </Svg>
+);
+
+export const ZoomOutIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <circle cx="11" cy="11" r="7" />
+    <path d="m20 20-3.5-3.5M8 11h6" />
+  </Svg>
+);
+
+export const InvertIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="4" y="4" width="16" height="16" rx="3" />
+    <path d="M4 20 20 4v13a3 3 0 0 1-3 3Z" fill="currentColor" />
+  </Svg>
+);
+
+export const RotateIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M20 11a8 8 0 1 0-2.3 5.7" />
+    <path d="M20 4v7h-7" />
+  </Svg>
+);
+
+export const FlipIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 3v18" strokeDasharray="2 2.5" />
+    <path d="M8 7 3 17h5Z" />
+    <path d="m16 7 5 10h-5Z" fill="currentColor" />
+  </Svg>
+);
+
+export const MaximizeIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+  </Svg>
+);
+
+export const ColumnsIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M12 4v16" />
+  </Svg>
+);
+
+export const ActivityIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M3 12h4l2.5-6 4 12 2.5-6H21" />
+  </Svg>
+);
+
 export function LogoMark({ size = 28 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" focusable="false">
