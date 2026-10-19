@@ -14,7 +14,7 @@ import { Results, ResultsSkeleton } from "./components/Results";
 import { EmptyState, ErrorState, LoadingState } from "./components/States";
 
 const K_OPTIONS = [5, 10, 15, 20, 24];
-const DEFAULT_K = 10;
+const DEFAULT_K = 5;
 const MAX_HISTORY = 8;
 
 let nextEntryId = 0;

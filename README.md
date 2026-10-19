@@ -15,8 +15,8 @@ The backend is a FastAPI service hosted on Hugging Face Spaces: [`saad003/rad-re
 
 - Drag-and-drop, file picker, or paste an image from the clipboard (`Ctrl+V`)
 - Six one-click samples from the ROCOv2 test split (CT, X-ray, MRI, ultrasound, angiography, PET)
-- Choose how many neighbours to retrieve (k = 5–24)
-- Query analysis: caption source (ground truth vs. generated), modality from neighbour concepts vs. the backend's caption keyword rule, top-1 / mean cosine similarity
+- Choose how many neighbours to retrieve (k = 5–24, default 5)
+- Query analysis: caption (flagged when it is AI-generated), modality from neighbour concepts vs. the backend's caption keyword rule, top-1 / mean cosine similarity
 - Concept profile: how many of the k neighbours carry each UMLS concept, with official ROCOv2 concept names
 - Filter results by concept
 - Detail view with full caption, concepts and CUIs; browse with arrow keys; **"Search with this image"** to pivot the query
@@ -33,7 +33,7 @@ After a search, **Generate report** opens a live preview of an A4 PDF that you c
 2. **Image and findings**: the query image, the caption (labelled as the ROCOv2 reference caption or an AI-generated caption), and an impression derived from the retrieved cases' concepts
 3. **Retrieval summary**: modality, body region and view by concept consensus, the caption-keyword modality (with agreement), and top-1 and mean similarity
 4. **Concept profile (UMLS)**: each concept with its canonical name, CUI, category and share of the k cases
-5. **Similar reference cases**: rank, thumbnail, case ID and split, similarity, caption and concepts
+5. **Similar reference cases**: rank, thumbnail, similarity and caption
 6. **Sign-off** lines, with running headers, page numbers and a "research use only" footer
 
 Case ID and notes reset for each new image. "Prepared by" is kept for the session.

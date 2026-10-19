@@ -8,7 +8,6 @@ import {
   aggregateConcepts,
   GROUP_LABEL,
   modalityConsensus,
-  parseConcepts,
   textModalityMatches,
   type ConceptGroup,
   type ConceptStat,
@@ -579,31 +578,23 @@ export async function buildReportPdf(opts: ReportOptions): Promise<ReportResult>
     ...tableBase,
     startY: y,
     rowPageBreak: "avoid",
-    head: [["#", ...(withThumbs ? ["Image"] : []), "Case", "Similarity", "Reference caption", "Concepts"]],
+    head: [["#", ...(withThumbs ? ["Image"] : []), "Similarity", "Reference caption"]],
     body: results.map((r, i) => [
       String(i + 1),
       ...(withThumbs ? [""] : []),
-      `${r.ID.replace("ROCOv2_2023_", "")}\n${r.split.toUpperCase()}`,
       r.score.toFixed(3),
       pdfSafe(r.caption) || "-",
-      parseConcepts(r.concepts_manual)
-        .map((c) => c.label)
-        .join(", ") || "-",
     ]),
     bodyStyles: withThumbs ? { minCellHeight: 25 } : undefined,
     columnStyles: withThumbs
       ? {
           0: { cellWidth: 8, halign: "center", fontStyle: "bold" },
           1: { cellWidth: 25 },
-          2: { cellWidth: 25, font: "courier", fontSize: 7.4 },
-          3: { cellWidth: 17, halign: "center", fontStyle: "bold" },
-          5: { cellWidth: 27, fontSize: 7.6 },
+          2: { cellWidth: 20, halign: "center", fontStyle: "bold" },
         }
       : {
           0: { cellWidth: 8, halign: "center", fontStyle: "bold" },
-          1: { cellWidth: 27, font: "courier", fontSize: 7.4 },
-          2: { cellWidth: 18, halign: "center", fontStyle: "bold" },
-          4: { cellWidth: 30, fontSize: 7.6 },
+          1: { cellWidth: 20, halign: "center", fontStyle: "bold" },
         },
     didDrawCell: (d: CellHookData) => {
       if (d.section !== "body" || d.column.index !== imgCol) return;

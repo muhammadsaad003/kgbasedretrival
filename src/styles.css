@@ -945,10 +945,6 @@ kbd {
   font-size: 12px;
   font-weight: 600;
 }
-.source-badge.is-gt {
-  background: var(--ok-soft);
-  color: var(--ok);
-}
 .source-badge.is-gen {
   background: var(--warn-soft);
   color: var(--warn);
@@ -964,6 +960,9 @@ kbd {
   letter-spacing: -0.01em;
   text-wrap: pretty;
 }
+.caption-quote:first-child {
+  margin-top: 0;
+}
 
 .caption-foot {
   display: flex;
@@ -977,6 +976,7 @@ kbd {
 }
 .caption-foot .btn {
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .facts {

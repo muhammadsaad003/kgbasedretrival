@@ -19,12 +19,9 @@ export function Results({ results, visible, filter, onFilter, onOpen }: Props) {
   return (
     <section className="results" aria-labelledby="results-title">
       <div className="results-head">
-        <div>
-          <h2 id="results-title" className="results-title">
-            {results.length} similar {results.length === 1 ? "image" : "images"}
-          </h2>
-          <p className="section-meta">Ranked by PubMedCLIP cosine similarity · click an image for details</p>
-        </div>
+        <h2 id="results-title" className="results-title">
+          {results.length} similar {results.length === 1 ? "image" : "images"}
+        </h2>
       </div>
 
       {stats.length > 0 && (
