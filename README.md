@@ -34,7 +34,7 @@ After a search, **Generate report** opens a live preview of an A4 PDF that you c
 3. **Retrieval summary**: modality, body region and view by concept consensus, the caption-keyword modality (with agreement), and top-1 and mean similarity
 4. **Concept profile (UMLS)**: each concept with its canonical name, CUI, category and share of the k cases
 5. **Similar reference cases**: rank, thumbnail, case ID and split, similarity, caption and concepts
-6. **Method, disclaimer and sign-off**, with running headers, page numbers and a "research use only" footer
+6. **Sign-off** lines, with running headers, page numbers and a "research use only" footer
 
 Case ID and notes reset for each new image. "Prepared by" is kept for the session.
 

@@ -164,7 +164,7 @@ export function ReportDialog({ entry, response, meta, onMeta, onClose }: Props) 
                 <li>Retrieval summary</li>
                 <li>UMLS concept profile</li>
                 <li>{n} similar reference cases</li>
-                <li>Method, disclaimer and sign-off</li>
+                <li>Sign-off</li>
               </ol>
             </div>
           </form>
