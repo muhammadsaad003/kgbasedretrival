@@ -1,0 +1,283 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { API_URL, ApiError, fetchImageAsFile, searchByImage, validateImageFile, type RetrievedImage } from "./api";
+import { parseConcepts } from "./concepts";
+import { useApiStatus, useTheme } from "./hooks";
+import { SAMPLES, type Sample } from "./samples";
+import type { EntrySource, QueryEntry } from "./types";
+import { Analysis } from "./components/Analysis";
+import { Header } from "./components/Header";
+import { Lightbox } from "./components/Lightbox";
+import { QueryPanel } from "./components/QueryPanel";
+import { Results, ResultsSkeleton } from "./components/Results";
+import { EmptyState, ErrorState, LoadingState } from "./components/States";
+
+const K_OPTIONS = [5, 10, 15, 20, 24];
+const DEFAULT_K = 10;
+const MAX_HISTORY = 8;
+
+let nextEntryId = 0;
+let nextRunId = 0;
+
+export default function App() {
+  const { theme, cycle } = useTheme();
+  const api = useApiStatus();
+  const { markOnline, markOffline } = api;
+
+  const [entries, setEntries] = useState<QueryEntry[]>([]);
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [k, setK] = useState(DEFAULT_K);
+  const [filter, setFilter] = useState<string | null>(null);
+  const [lightbox, setLightbox] = useState<number | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const current = entries.find((e) => e.id === currentId) ?? null;
+
+  // Release preview object URLs once their entries fall out of history.
+  const liveUrls = useRef(new Set<string>());
+  useEffect(() => {
+    const live = new Set(entries.map((e) => e.previewUrl));
+    for (const url of liveUrls.current) if (!live.has(url)) URL.revokeObjectURL(url);
+    liveUrls.current = live;
+  }, [entries]);
+
+  const patchRun = (id: string, runId: number, patch: Partial<QueryEntry>) =>
+    setEntries((es) => es.map((e) => (e.id === id && e.runId === runId ? { ...e, ...patch } : e)));
+
+  const runSearch = useCallback(
+    async (entry: QueryEntry, kValue: number) => {
+      abortRef.current?.abort();
+      const ctrl = new AbortController();
+      abortRef.current = ctrl;
+      const runId = ++nextRunId;
+      const startedAt = Date.now();
+
+      setEntries((es) =>
+        es.map((e) =>
+          e.id === entry.id
+            ? { ...e, k: kValue, runId, status: "loading", startedAt, response: undefined, error: undefined }
+            : e,
+        ),
+      );
+      setFilter(null);
+      setLightbox(null);
+
+      try {
+        const response = await searchByImage(entry.file, kValue, ctrl.signal);
+        patchRun(entry.id, runId, { status: "done", response, elapsedMs: Date.now() - startedAt });
+        markOnline();
+      } catch (err) {
+        if (ctrl.signal.aborted) {
+          patchRun(entry.id, runId, { status: "idle" });
+          return;
+        }
+        const message = err instanceof Error ? err.message : "Unexpected error.";
+        patchRun(entry.id, runId, { status: "error", error: message, elapsedMs: Date.now() - startedAt });
+        // An HTTP status means the server answered; anything else means it was unreachable.
+        if (err instanceof ApiError && err.status) markOnline();
+        else markOffline();
+      }
+    },
+    [markOnline, markOffline],
+  );
+
+  const addQuery = useCallback(
+    (file: File, name: string, source: EntrySource) => {
+      const problem = validateImageFile(file);
+      if (problem) {
+        setNotice(problem);
+        return;
+      }
+      setNotice(null);
+      const entry: QueryEntry = {
+        id: `q${++nextEntryId}`,
+        file,
+        previewUrl: URL.createObjectURL(file),
+        name,
+        source,
+        k,
+        status: "idle",
+        runId: 0,
+        startedAt: null,
+      };
+      setEntries((es) => [entry, ...es].slice(0, MAX_HISTORY));
+      setCurrentId(entry.id);
+      runSearch(entry, k);
+    },
+    [k, runSearch],
+  );
+
+  // Downloading a sample/neighbour image takes a moment; a newer user action must win over it.
+  const prepareRef = useRef<AbortController | null>(null);
+  const cancelPreparing = useCallback(() => {
+    prepareRef.current?.abort();
+    prepareRef.current = null;
+    setPreparing(null);
+  }, []);
+
+  const addFromUrl = useCallback(
+    async (url: string, id: string, source: EntrySource) => {
+      prepareRef.current?.abort();
+      const ctrl = new AbortController();
+      prepareRef.current = ctrl;
+      setPreparing(id);
+      try {
+        const file = await fetchImageAsFile(url, `${id}.jpg`, ctrl.signal);
+        if (!ctrl.signal.aborted) addQuery(file, id, source);
+      } catch (err) {
+        if (ctrl.signal.aborted) return;
+        setNotice(err instanceof Error ? `Could not load ${id}: ${err.message}` : `Could not load ${id}.`);
+      } finally {
+        if (prepareRef.current === ctrl) {
+          prepareRef.current = null;
+          setPreparing(null);
+        }
+      }
+    },
+    [addQuery],
+  );
+
+  const onUpload = (file: File) => {
+    cancelPreparing();
+    addQuery(file, file.name || "Uploaded image", "upload");
+  };
+
+  const onSample = (s: Sample) => addFromUrl(s.url, s.id, "sample");
+
+  const onSearchNeighbour = (item: RetrievedImage) => {
+    setLightbox(null);
+    addFromUrl(item.image_url, item.ID, "neighbour");
+  };
+
+  const onK = (value: number) => {
+    setK(value);
+    if (current && current.k !== value) runSearch(current, value);
+  };
+
+  const onRetry = () => current && runSearch(current, k);
+
+  const onClear = () => {
+    cancelPreparing();
+    abortRef.current?.abort();
+    setCurrentId(null);
+    setLightbox(null);
+    setFilter(null);
+  };
+
+  const onSelectRecent = (id: string) => {
+    const entry = entries.find((e) => e.id === id);
+    if (!entry) return;
+    cancelPreparing();
+    setCurrentId(id);
+    setK(entry.k);
+    setFilter(null);
+    setLightbox(null);
+    if (entry.status === "idle") runSearch(entry, entry.k);
+  };
+
+  // Paste an image from the clipboard anywhere on the page.
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const item = [...(e.clipboardData?.items ?? [])].find((i) => i.kind === "file" && i.type.startsWith("image/"));
+      const file = item?.getAsFile();
+      if (!file) return;
+      e.preventDefault();
+      cancelPreparing();
+      addQuery(file, file.name && file.name !== "image.png" ? file.name : "Pasted image", "paste");
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [addQuery, cancelPreparing]);
+
+  const results = current?.status === "done" ? current.response?.results ?? [] : [];
+  const visible = useMemo(
+    () => (filter ? results.filter((r) => parseConcepts(r.concepts_manual).some((c) => c.cui === filter)) : results),
+    [results, filter],
+  );
+  const rankOf = useCallback(
+    (id: string) => results.findIndex((r) => r.ID === id) + 1,
+    [results],
+  );
+  const closeLightbox = useCallback(() => setLightbox(null), []);
+
+  return (
+    <div className="app">
+      <a className="skip-link" href="#content">
+        Skip to results
+      </a>
+      <Header status={api.status} onRecheck={api.recheck} theme={theme} onCycleTheme={cycle} />
+
+      <main className="layout">
+        <aside className="sidebar" aria-label="Query">
+          <QueryPanel
+            current={current}
+            entries={entries}
+            k={k}
+            kOptions={K_OPTIONS}
+            onK={onK}
+            onFile={onUpload}
+            onClear={onClear}
+            onRetry={onRetry}
+            samples={SAMPLES}
+            onSample={onSample}
+            preparing={preparing}
+            onSelectRecent={onSelectRecent}
+            notice={notice}
+            onDismissNotice={() => setNotice(null)}
+          />
+        </aside>
+
+        <section id="content" className="content" aria-label="Results">
+          {!current && <EmptyState />}
+          {current?.status === "loading" && (
+            <>
+              <LoadingState startedAt={current.startedAt} />
+              <ResultsSkeleton count={current.k} />
+            </>
+          )}
+          {current?.status === "error" && <ErrorState message={current.error ?? "Unknown error."} onRetry={onRetry} />}
+          {current?.status === "idle" && (
+            <ErrorState message="This search was interrupted before it finished." onRetry={onRetry} />
+          )}
+          {current?.status === "done" && current.response && (
+            <>
+              <Analysis response={current.response} elapsedMs={current.elapsedMs} />
+              <Results
+                results={results}
+                visible={visible}
+                filter={filter}
+                onFilter={setFilter}
+                onOpen={setLightbox}
+              />
+            </>
+          )}
+        </section>
+      </main>
+
+      <footer className="footer">
+        <div className="footer-inner">
+          <p>
+            <strong>Research prototype — not for clinical use.</strong> Images and captions from ROCOv2 (PMC Open Access
+            subset, CC BY-NC-SA 4.0). Retrieval: PubMedCLIP + FAISS. Captioning: BLIP-ROCO.
+          </p>
+          <p className="mono footer-api" title="Backend base URL">
+            {API_URL}
+          </p>
+        </div>
+      </footer>
+
+      {lightbox !== null && visible[lightbox] && (
+        <Lightbox
+          items={visible}
+          index={lightbox}
+          rankOf={rankOf}
+          onIndex={setLightbox}
+          onClose={closeLightbox}
+          onSearch={onSearchNeighbour}
+          searching={preparing !== null}
+        />
+      )}
+    </div>
+  );
+}
