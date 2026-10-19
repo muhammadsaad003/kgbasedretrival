@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API_URL, ApiError, fetchImageAsFile, searchByImage, validateImageFile, type RetrievedImage } from "./api";
 import { parseConcepts } from "./concepts";
 import { useApiStatus, useTheme } from "./hooks";
+import { EMPTY_REPORT_META, type ReportMeta } from "./reportInfo";
 import { SAMPLES, type Sample } from "./samples";
 import type { EntrySource, QueryEntry } from "./types";
 import { Analysis } from "./components/Analysis";
 import { Header } from "./components/Header";
 import { Lightbox } from "./components/Lightbox";
 import { QueryPanel } from "./components/QueryPanel";
+import { ReportDialog } from "./components/ReportDialog";
 import { Results, ResultsSkeleton } from "./components/Results";
 import { EmptyState, ErrorState, LoadingState } from "./components/States";
 
@@ -30,6 +32,9 @@ export default function App() {
   const [lightbox, setLightbox] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [preparing, setPreparing] = useState<string | null>(null);
+  const [reportOpen, setReportOpen] = useState(false);
+  // Kept here so the details typed into the report form survive closing and reopening it.
+  const [reportMeta, setReportMeta] = useState<ReportMeta>(EMPTY_REPORT_META);
   const abortRef = useRef<AbortController | null>(null);
 
   const current = entries.find((e) => e.id === currentId) ?? null;
@@ -62,6 +67,7 @@ export default function App() {
       );
       setFilter(null);
       setLightbox(null);
+      setReportOpen(false);
 
       try {
         const response = await searchByImage(entry.file, kValue, ctrl.signal);
@@ -82,6 +88,12 @@ export default function App() {
     [markOnline, markOffline],
   );
 
+  // Read k through a ref: a sample download can finish after the user has changed k.
+  const kRef = useRef(k);
+  useEffect(() => {
+    kRef.current = k;
+  }, [k]);
+
   const addQuery = useCallback(
     (file: File, name: string, source: EntrySource) => {
       const problem = validateImageFile(file);
@@ -90,22 +102,25 @@ export default function App() {
         return;
       }
       setNotice(null);
+      const kValue = kRef.current;
       const entry: QueryEntry = {
         id: `q${++nextEntryId}`,
         file,
         previewUrl: URL.createObjectURL(file),
         name,
         source,
-        k,
+        k: kValue,
         status: "idle",
         runId: 0,
         startedAt: null,
       };
       setEntries((es) => [entry, ...es].slice(0, MAX_HISTORY));
       setCurrentId(entry.id);
-      runSearch(entry, k);
+      // A new image is a new case: keep the author, drop case-specific details.
+      setReportMeta((m) => ({ ...m, caseId: "", notes: "" }));
+      runSearch(entry, kValue);
     },
-    [k, runSearch],
+    [runSearch],
   );
 
   // Downloading a sample/neighbour image takes a moment; a newer user action must win over it.
@@ -152,7 +167,8 @@ export default function App() {
 
   const onK = (value: number) => {
     setK(value);
-    if (current && current.k !== value) runSearch(current, value);
+    // While a sample is downloading, the current query is about to be replaced; it will pick up the new k.
+    if (current && current.k !== value && !prepareRef.current) runSearch(current, value);
   };
 
   const onRetry = () => current && runSearch(current, k);
@@ -173,6 +189,7 @@ export default function App() {
     setK(entry.k);
     setFilter(null);
     setLightbox(null);
+    setReportOpen(false);
     if (entry.status === "idle") runSearch(entry, entry.k);
   };
 
@@ -200,17 +217,20 @@ export default function App() {
     [results],
   );
   const closeLightbox = useCallback(() => setLightbox(null), []);
+  const closeReport = useCallback(() => setReportOpen(false), []);
 
   return (
     <div className="app">
       <a className="skip-link" href="#content">
         Skip to results
       </a>
-      <Header status={api.status} onRecheck={api.recheck} theme={theme} onCycleTheme={cycle} />
+      <Header theme={theme} onCycleTheme={cycle} />
 
       <main className="layout">
         <aside className="sidebar" aria-label="Query">
           <QueryPanel
+            serverUnreachable={api.status === "offline"}
+            onRecheckServer={api.recheck}
             current={current}
             entries={entries}
             k={k}
@@ -242,7 +262,11 @@ export default function App() {
           )}
           {current?.status === "done" && current.response && (
             <>
-              <Analysis response={current.response} elapsedMs={current.elapsedMs} />
+              <Analysis
+                response={current.response}
+                elapsedMs={current.elapsedMs}
+                onReport={() => setReportOpen(true)}
+              />
               <Results
                 results={results}
                 visible={visible}
@@ -276,6 +300,16 @@ export default function App() {
           onClose={closeLightbox}
           onSearch={onSearchNeighbour}
           searching={preparing !== null}
+        />
+      )}
+
+      {reportOpen && current?.status === "done" && current.response && (
+        <ReportDialog
+          entry={current}
+          response={current.response}
+          meta={reportMeta}
+          onMeta={setReportMeta}
+          onClose={closeReport}
         />
       )}
     </div>

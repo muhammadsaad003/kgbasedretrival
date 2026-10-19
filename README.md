@@ -20,9 +20,27 @@ The backend is a FastAPI service hosted on Hugging Face Spaces: [`saad003/rad-re
 - Concept profile: how many of the k neighbours carry each UMLS concept, with official ROCOv2 concept names
 - Filter results by concept
 - Detail view with full caption, concepts and CUIs; browse with arrow keys; **"Search with this image"** to pivot the query
+- **Downloadable PDF report** in a radiology-report layout (see below)
 - Recent queries for the session
-- Live API status with automatic retry while the Space wakes up
+- If the Space is asleep or unreachable, a notice appears and the app retries automatically
 - Light / dark / system theme, responsive down to phone width, keyboard accessible
+
+## Radiology report (PDF)
+
+After a search, **Generate report** opens a live preview of an A4 PDF that you can download. It's built entirely in the browser with jsPDF, and nothing you type into the form is uploaded. The report contains:
+
+1. **Study information**: patient/case ID, prepared by, image file and source, date, dataset match, retrieval settings, findings source, plus optional clinical indication/notes
+2. **Image and findings**: the query image, the caption (labelled as the ROCOv2 reference caption or an AI-generated caption), and an impression derived from the retrieved cases' concepts
+3. **Retrieval summary**: modality, body region and view by concept consensus, the caption-keyword modality (with agreement), and top-1 and mean similarity
+4. **Concept profile (UMLS)**: each concept with its canonical name, CUI, category and share of the k cases
+5. **Similar reference cases**: rank, thumbnail, case ID and split, similarity, caption and concepts
+6. **Method, disclaimer and sign-off**, with running headers, page numbers and a "research use only" footer
+
+Case ID and notes reset for each new image. "Prepared by" is kept for the session.
+
+| Page 1 | Page 2 |
+| ------ | ------ |
+| ![Report page 1](docs/report-page1.png) | ![Report page 2](docs/report-page2.png) |
 
 ## Run locally
 
@@ -95,10 +113,12 @@ Restart `npm run dev` after changing it.
 src/
   api.ts              API client, validation, types
   concepts.ts         The 18 ROCOv2 UMLS concepts, parsing and aggregation
+  report.ts           PDF report builder (jsPDF + autotable, lazy-loaded)
+  reportInfo.ts       Report IDs, file names and form fields
   samples.ts          Sample images
-  hooks.ts            API status, theme, timers, clipboard
+  hooks.ts            API status, theme, dialogs, timers, clipboard
   App.tsx             State and layout
-  components/         Header, QueryPanel, Analysis, Results, Lightbox, States, icons
+  components/         Header, QueryPanel, Analysis, Results, Lightbox, ReportDialog, States, icons
   styles.css          Design tokens and styles (light and dark)
 ```
 

@@ -1,24 +1,16 @@
-import type { ApiStatus, ThemePref } from "../hooks";
+import type { ThemePref } from "../hooks";
 import { CodeIcon, LogoMark, MonitorIcon, MoonIcon, SunIcon } from "./icons";
 
 const REPO_URL = "https://github.com/muhammadsaad003/kgbasedretrival";
 
-const STATUS_TEXT: Record<ApiStatus, string> = {
-  checking: "Checking API…",
-  online: "API online",
-  offline: "API unreachable · retrying",
-};
-
 const THEME_NEXT: Record<ThemePref, string> = { system: "light", light: "dark", dark: "system" };
 
 interface Props {
-  status: ApiStatus;
-  onRecheck: () => void;
   theme: ThemePref;
   onCycleTheme: () => void;
 }
 
-export function Header({ status, onRecheck, theme, onCycleTheme }: Props) {
+export function Header({ theme, onCycleTheme }: Props) {
   const ThemeIcon = theme === "light" ? SunIcon : theme === "dark" ? MoonIcon : MonitorIcon;
   return (
     <header className="topbar">
@@ -31,15 +23,6 @@ export function Header({ status, onRecheck, theme, onCycleTheme }: Props) {
           </span>
         </a>
         <div className="topbar-actions">
-          <button
-            type="button"
-            className={`status-pill status-${status}`}
-            onClick={onRecheck}
-            title="Click to check the backend again"
-          >
-            <span className="status-dot" aria-hidden="true" />
-            <span className="status-text">{STATUS_TEXT[status]}</span>
-          </button>
           <button
             type="button"
             className="icon-btn"

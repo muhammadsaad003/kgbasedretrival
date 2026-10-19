@@ -1,14 +1,15 @@
 import type { SearchResponse } from "../api";
 import { aggregateConcepts, GROUP_LABEL, modalityConsensus, textModalityMatches, type ConceptGroup } from "../concepts";
 import { CopyButton, formatScore, formatSeconds } from "./ui";
-import { DatabaseIcon, SparkIcon } from "./icons";
+import { DatabaseIcon, FileTextIcon, SparkIcon } from "./icons";
 
 interface Props {
   response: SearchResponse;
   elapsedMs?: number;
+  onReport: () => void;
 }
 
-export function Analysis({ response, elapsedMs }: Props) {
+export function Analysis({ response, elapsedMs, onReport }: Props) {
   const { results } = response;
   const n = results.length;
   const consensus = modalityConsensus(results);
@@ -25,8 +26,13 @@ export function Analysis({ response, elapsedMs }: Props) {
   return (
     <article className="card analysis" aria-labelledby="analysis-title">
       <div className="analysis-head">
-        <h2 id="analysis-title" className="section-title">Query analysis</h2>
-        <span className="section-meta mono">answered in {formatSeconds(elapsedMs)}</span>
+        <div className="analysis-title-group">
+          <h2 id="analysis-title" className="section-title">Query analysis</h2>
+          <span className="section-meta mono">answered in {formatSeconds(elapsedMs)}</span>
+        </div>
+        <button type="button" className="btn btn-primary btn-sm" onClick={onReport}>
+          <FileTextIcon size={15} /> Generate report
+        </button>
       </div>
 
       <div className="caption-block">

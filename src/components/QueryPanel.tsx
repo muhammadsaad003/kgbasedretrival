@@ -12,6 +12,8 @@ const SOURCE_LABEL: Record<QueryEntry["source"], string> = {
 };
 
 interface Props {
+  serverUnreachable: boolean;
+  onRecheckServer: () => void;
   current: QueryEntry | null;
   entries: QueryEntry[];
   k: number;
@@ -163,6 +165,16 @@ export function QueryPanel(props: Props) {
             ))}
           </div>
         </div>
+
+        {props.serverUnreachable && (
+          <div className="inline-alert inline-alert-warn" role="status">
+            <AlertIcon size={16} />
+            <span>Can't reach the retrieval server. It may be waking up; retrying automatically.</span>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={props.onRecheckServer}>
+              Retry
+            </button>
+          </div>
+        )}
 
         {props.notice && (
           <div className="inline-alert" role="alert">

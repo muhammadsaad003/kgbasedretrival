@@ -1,6 +1,7 @@
-import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { useEffect, useRef } from "react";
 import type { RetrievedImage } from "../api";
 import { GROUP_LABEL, parseConcepts } from "../concepts";
+import { useDialog } from "../hooks";
 import { ConceptChip, CopyButton, SplitBadge, formatScore } from "./ui";
 import { ChevronLeftIcon, ChevronRightIcon, ExternalIcon, SearchIcon, XIcon } from "./icons";
 
@@ -15,50 +16,20 @@ interface Props {
 }
 
 export function Lightbox({ items, index, rankOf, onIndex, onClose, onSearch, searching }: Props) {
-  const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const { dialogRef, onKeyDown } = useDialog(onClose, closeRef);
   const item = items[index];
   const hasPrev = index > 0;
   const hasNext = index < items.length - 1;
 
   useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    const overflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    closeRef.current?.focus();
-    return () => {
-      document.body.style.overflow = overflow;
-      previous?.focus?.();
-    };
-  }, []);
-
-  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowLeft" && hasPrev) onIndex(index - 1);
+      if (e.key === "ArrowLeft" && hasPrev) onIndex(index - 1);
       else if (e.key === "ArrowRight" && hasNext) onIndex(index + 1);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [index, hasPrev, hasNext, onClose, onIndex]);
-
-  // Keep Tab focus inside the dialog.
-  const trapTab = (e: ReactKeyboardEvent) => {
-    if (e.key !== "Tab" || !dialogRef.current) return;
-    const focusables = dialogRef.current.querySelectorAll<HTMLElement>(
-      'button:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
-    );
-    if (focusables.length === 0) return;
-    const first = focusables[0];
-    const last = focusables[focusables.length - 1];
-    if (e.shiftKey && document.activeElement === first) {
-      e.preventDefault();
-      last.focus();
-    } else if (!e.shiftKey && document.activeElement === last) {
-      e.preventDefault();
-      first.focus();
-    }
-  };
+  }, [index, hasPrev, hasNext, onIndex]);
 
   if (!item) return null;
   const concepts = parseConcepts(item.concepts_manual);
@@ -72,7 +43,7 @@ export function Lightbox({ items, index, rankOf, onIndex, onClose, onSearch, sea
         role="dialog"
         aria-modal="true"
         aria-labelledby="lb-title"
-        onKeyDown={trapTab}
+        onKeyDown={onKeyDown}
       >
         <div className="lb-media well">
           <img key={item.ID} src={item.image_url} alt={caption} />
